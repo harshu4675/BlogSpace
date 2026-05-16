@@ -24,24 +24,34 @@ const Home = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [featuredRes, latestRes, trendingRes, catRes] = await Promise.all([
-        api.get("/posts/featured"),
-        api.get("/posts?limit=8&sort=-publishedAt"),
-        api.get("/posts/trending"),
-        api.get("/categories"),
-      ]);
-      setFeatured(featuredRes.data.data.posts);
-      setLatest(latestRes.data.data.posts);
-      setTrending(trendingRes.data.data.posts);
-      setCategories(catRes.data.data.categories);
-    } catch (err) {
-      console.error("Failed to fetch home data:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+// In Home.jsx, replace fetchData function:
+const fetchData = useCallback(async () => {
+  try {
+    setLoading(true);
+    const [featuredRes, latestRes, trendingRes, catRes] = await Promise.all([
+      api.get('/posts/featured'),
+      api.get('/posts?limit=8&sort=-publishedAt'),
+      api.get('/posts/trending'),
+      api.get('/categories'),
+    ]);
+
+    // Safe data extraction with fallbacks
+    setFeatured(featuredRes?.data?.data?.posts || []);
+    setLatest(latestRes?.data?.data?.posts || []);
+    setTrending(trendingRes?.data?.data?.posts || []);
+    setCategories(catRes?.data?.data?.categories || []);
+    
+  } catch (err) {
+    console.error('Failed to fetch home data:', err.message);
+    // Set empty arrays so page doesn't crash
+    setFeatured([]);
+    setLatest([]);
+    setTrending([]);
+    setCategories([]);
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => {
     fetchData();
