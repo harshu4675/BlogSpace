@@ -51,14 +51,25 @@ const BlogList = () => {
 
         const { data } = await api.get(`/posts?${params.toString()}`);
 
+        // Safe access with fallbacks
+        const posts = data?.data?.posts || [];
+        const pagination = data?.data?.pagination || {
+          current: 1,
+          pages: 1,
+          total: 0,
+          hasMore: false,
+        };
+
         if (append) {
-          setPosts((prev) => [...prev, ...data.data.posts]);
+          setPosts((prev) => [...prev, ...posts]);
         } else {
-          setPosts(data.data.posts);
+          setPosts(posts);
         }
-        setPagination(data.data.pagination);
+        setPagination(pagination);
       } catch (err) {
-        console.error("Failed to fetch posts:", err);
+        console.error("Failed to fetch posts:", err.message);
+        setPosts([]);
+        setPagination({ current: 1, pages: 1, total: 0, hasMore: false });
       } finally {
         setLoading(false);
         setLoadingMore(false);
@@ -66,7 +77,6 @@ const BlogList = () => {
     },
     [currentCategory, currentSort, currentTag, featured],
   );
-
   useEffect(() => {
     api
       .get("/categories")
