@@ -59,29 +59,34 @@ app.use(
 );
 
 // Replace the cors config with this:
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://blogspacebyharshuu.netlify.app', // Your exact Netlify URL
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 app.use(cors({
-  origin: function (origin, callback) {
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      process.env.CLIENT_URL,
-      // Add your Netlify URL
-      'https://your-site-name.netlify.app',
-    ].filter(Boolean);
-
-    // Allow requests with no origin (mobile apps, Postman)
+  origin: function(origin, callback) {
+    // Allow no origin (Postman, mobile apps)
     if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin) || origin.endsWith('.netlify.app')) {
+    
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log('CORS blocked:', origin);
-      callback(null, true); // Allow all for now, restrict later
+      console.log('⚠️ CORS blocked origin:', origin);
+      // In production, allow all Netlify subdomains
+      if (origin.includes('netlify.app') || origin.includes('localhost')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['set-cookie'],
 }));
 app.use(compression());
 app.use(express.json({ limit: "10mb" }));
