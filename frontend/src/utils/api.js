@@ -1,12 +1,17 @@
-import axios from "axios";
+import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
+// This is the KEY fix - use environment variable
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Helper to fix image URLs
+console.log('🔗 API Base URL:', API_BASE);
+
 export const getImageUrl = (url) => {
   if (!url) return null;
-  if (url.startsWith("http")) return url; // Cloudinary URL - already full
-  if (url.startsWith("/uploads")) return `http://localhost:5000${url}`; // Local file
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/uploads')) {
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    return `${baseUrl}${url}`;
+  }
   return url;
 };
 
@@ -15,23 +20,23 @@ const api = axios.create({
   withCredentials: true,
   timeout: 30000,
   headers: {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   },
 });
 
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken");
+    const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error),
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor
+// Response interceptor with token refresh
 let isRefreshing = false;
 let failedQueue = [];
 
@@ -64,17 +69,17 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await api.post("/auth/refresh");
+        const { data } = await api.post('/auth/refresh');
         const newToken = data.data.accessToken;
-        localStorage.setItem("accessToken", newToken);
+        localStorage.setItem('accessToken', newToken);
         processQueue(null, newToken);
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        localStorage.removeItem("accessToken");
-        if (window.location.pathname !== "/login") {
-          window.location.href = "/login";
+        localStorage.removeItem('accessToken');
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
         }
         return Promise.reject(refreshError);
       } finally {
@@ -83,7 +88,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  },
+  }
 );
 
 export default api;
