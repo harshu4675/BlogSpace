@@ -10,10 +10,10 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Load .env FIRST before anything else
+// Load .env FIRST
 dotenv.config();
 
-// Now import everything else AFTER dotenv
+// Imports AFTER dotenv
 import connectDB from "./config/database.js";
 import authRoutes from "./routes/authRoutes.js";
 import postRoutes from "./routes/postRoutes.js";
@@ -35,7 +35,7 @@ const PORT = process.env.PORT || 5000;
 // Connect Database
 connectDB();
 
-// Test Cloudinary after env is loaded
+// Cloudinary Config
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -44,9 +44,12 @@ cloudinary.config({
 });
 
 if (process.env.CLOUDINARY_CLOUD_NAME) {
-  console.log("☁️  Cloudinary configured:", process.env.CLOUDINARY_CLOUD_NAME);
+  console.log(
+    "☁️ Cloudinary configured:",
+    process.env.CLOUDINARY_CLOUD_NAME
+  );
 } else {
-  console.warn("⚠️  Cloudinary NOT configured - check .env file");
+  console.warn("⚠️ Cloudinary NOT configured - check .env file");
 }
 
 // Security Middleware
@@ -55,52 +58,69 @@ app.use(
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
     contentSecurityPolicy: false,
-  }),
+  })
 );
 
-// Replace the cors config with this:
+// ================= CORS CONFIG =================
+
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://blogspacebyharshuu.netlify.app', // Your exact Netlify URL
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://blogspacebyharshuu.netlify.app",
+  "https://blogspace-fxgv.onrender.com",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
-app.use(cors({
-  origin: function(origin, callback) {
-    // Allow no origin (Postman, mobile apps)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('⚠️ CORS blocked origin:', origin);
-      // In production, allow all Netlify subdomains
-      if (origin.includes('netlify.app') || origin.includes('localhost')) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests without origin (Postman/mobile apps)
+      if (!origin) return callback(null, true);
+
+      // Allow exact origins
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
       }
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-  exposedHeaders: ['set-cookie'],
-}));
+
+      // Allow all localhost and netlify domains
+      if (
+        origin.includes("localhost") ||
+        origin.includes("netlify.app")
+      ) {
+        return callback(null, true);
+      }
+
+      console.log("⚠️ CORS blocked origin:", origin);
+      return callback(new Error("Not allowed by CORS"));
+    },
+
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Cookie",
+    ],
+    exposedHeaders: ["set-cookie"],
+  })
+);
+
+// =================================================
+
 app.use(compression());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 app.use(mongoSanitize());
 
-// Serve uploaded files (local fallback)
+// Static Uploads
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
+// Rate Limiter
 app.use("/api/", apiLimiter);
 
 // Health Check
@@ -108,7 +128,8 @@ app.get("/health", (req, res) => {
   res.json({
     status: "OK",
     timestamp: new Date().toISOString(),
-    cloudinary: process.env.CLOUDINARY_CLOUD_NAME || "not configured",
+    cloudinary:
+      process.env.CLOUDINARY_CLOUD_NAME || "not configured",
   });
 });
 
@@ -120,30 +141,42 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 
-// Cron - publish scheduled posts
+// Cron Job - Publish Scheduled Posts
 cron.schedule("* * * * *", async () => {
   try {
     const now = new Date();
+
     await Post.updateMany(
-      { status: "scheduled", scheduledAt: { $lte: now } },
-      { $set: { status: "published", publishedAt: now } },
+      {
+        status: "scheduled",
+        scheduledAt: { $lte: now },
+      },
+      {
+        $set: {
+          status: "published",
+          publishedAt: now,
+        },
+      }
     );
   } catch (error) {
     console.error("Cron error:", error.message);
   }
 });
 
-// Production - serve frontend
+// Production Frontend
 if (process.env.NODE_ENV === "production") {
   const frontendPath = path.join(__dirname, "../frontend/dist");
+
   app.use(express.static(frontendPath, { maxAge: "1y" }));
+
   app.get("*", (req, res, next) => {
     if (req.originalUrl.startsWith("/api")) return next();
+
     res.sendFile(path.join(frontendPath, "index.html"));
   });
 }
 
-// 404
+// 404 API Handler
 app.use("/api/*", (req, res) => {
   res.status(404).json({
     success: false,
@@ -154,6 +187,7 @@ app.use("/api/*", (req, res) => {
 // Error Handler
 app.use(errorHandler);
 
+// Start Server
 app.listen(PORT, () => {
   console.log(`\n🚀 Server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV}`);
