@@ -1,20 +1,37 @@
 import axios from 'axios';
 
-// This is the KEY fix - use environment variable
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// Get API URL - works for both dev and production
+const getApiUrl = () => {
+  // Check Vite env variable (set in Netlify)
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // Local development fallback
+  return 'http://localhost:5000/api';
+};
 
-console.log('🔗 API Base URL:', API_BASE);
+const API_BASE = getApiUrl();
 
+// Debug log
+console.log('🔗 API URL:', API_BASE);
+console.log('🌍 Mode:', import.meta.env.MODE);
+
+// Image URL helper
 export const getImageUrl = (url) => {
   if (!url) return null;
-  if (url.startsWith('http')) return url;
-  if (url.startsWith('/uploads')) {
-    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
-    return `${baseUrl}${url}`;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url; // Already full URL (Cloudinary)
+  }
+  if (url.startsWith('/uploads/')) {
+    // Local file - prepend backend URL
+    const backendUrl = API_BASE.replace('/api', '');
+    return `${backendUrl}${url}`;
   }
   return url;
 };
 
+// Create axios instance
 const api = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
@@ -24,7 +41,7 @@ const api = axios.create({
   },
 });
 
-// Request interceptor
+// Request interceptor - attach token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
@@ -36,7 +53,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor with token refresh
+// Response interceptor - handle 401 & token refresh
 let isRefreshing = false;
 let failedQueue = [];
 
@@ -78,6 +95,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
         if (window.location.pathname !== '/login') {
           window.location.href = '/login';
         }
@@ -92,3 +110,16 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+// Wake up Render server (free tier sleeps)
+export const wakeUpServer = async () => {
+  try {
+    const healthUrl = API_BASE.replace('/api', '/health');
+    const res = await fetch(healthUrl, { method: 'GET' });
+    if (res.ok) {
+      console.log('✅ Backend server is awake');
+    }
+  } catch (e) {
+    console.log('⏳ Backend waking up...');
+  }
+};
