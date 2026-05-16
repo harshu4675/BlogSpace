@@ -1,10 +1,11 @@
 [build]
-  base = "frontend"
-  publish = "frontend/dist"
+  publish = "dist"
   command = "npm run build"
 
 [build.environment]
   VITE_API_URL = "https://blogspace-fxgv.onrender.com/api"
+  VITE_APP_NAME = "BlogSpace"
+  VITE_APP_URL = "https://blogspacebyharshuu.netlify.app"
 
 [[redirects]]
   from = "/api/*"
